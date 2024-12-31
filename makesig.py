@@ -11,6 +11,7 @@ import collections
 import ghidra.program.model.lang.OperandType as OperandType
 import ghidra.program.model.lang.Register as Register
 import ghidra.program.model.address.AddressSet as AddressSet
+from functools import reduce
 
 MAKE_SIG_AT = collections.OrderedDict([
 	('fn', 'start of function'),
@@ -21,11 +22,18 @@ BytePattern = collections.namedtuple('BytePattern', ['is_wildcard', 'byte'])
 
 def __bytepattern_ida_str(self):
 	# return an IDA-style binary search string
-	return '{:02X}'.format(self.byte) if not self.is_wildcard else '?'
+	return '{:02X}'.format(self.byte) if not self.is_wildcard else '??'
 
 def __bytepattern_sig_str(self):
 	# return a SourceMod-style byte signature
 	return r'\x{:02X}'.format(self.byte) if not self.is_wildcard else r'\x2A'
+
+def mlugg_str(patterns):
+    outstr = "static const struct byte_pattern ptrn = {\n"
+    outstr += "\t_PTRN_ARRAY({}),\n".format(', '.join(map(lambda b: '0x{:02X}'.format(b.byte) if not b.is_wildcard else '0x00', patterns)))
+    outstr += "\t_PTRN_ARRAY({})".format(', '.join(reduce(lambda idxs,x: idxs if not x[1].is_wildcard else (idxs.append(str(x[0])),idxs)[1] ,enumerate(patterns), [])))
+    outstr += "\n}"
+    return outstr
 
 BytePattern.ida_str = __bytepattern_ida_str
 BytePattern.sig_str = __bytepattern_sig_str
@@ -147,6 +155,7 @@ def process(start_at = MAKE_SIG_AT['fn'], min_length = 1):
 		print("Signature for", fn.getName())
 		print(*(b.ida_str() for b in byte_pattern))
 		print("".join(b.sig_str() for b in byte_pattern))
+		print(mlugg_str(byte_pattern))
 
 if __name__ == "__main__":
 	fm = currentProgram.getFunctionManager()
